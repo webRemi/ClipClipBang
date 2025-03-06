@@ -67,15 +67,14 @@ int main(int argc, char *argv[]) {
 		Sleep(5000);
 	}
 	*/
-	char* cClipTextX = NULL;
-	cClipTextX = GetClipboard();
-	printf("%s\n", cClipTextX);
+	char* cClipText = NULL;
+	cClipText = GetClipboard();
+	printf("%s\n", cClipText);
 
 	LPCSTR lpFileName = argv[1];
 	HANDLE hFile = NULL;
-	char* cBuffer = cClipTextX;
-	LPDWORD dwNumberofBytestoWrite = strlen(cClipTextX);
-	DWORD dwNumberOfbytesWritten;
+	DWORD sClipTextSize = strlen(cClipText);
+	LPDWORD lpNumberOfBytesWritten;
 
 	printf("%s Writing to a file\n", INFO);
 
@@ -85,7 +84,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (!WriteFile(hFile, cBuffer, dwNumberofBytestoWrite, &dwNumberOfbytesWritten, NULL)) {
+	if (!WriteFile(hFile, cClipText, sClipTextSize, &lpNumberOfBytesWritten, NULL)) {
 		printf("%s WriteFile failed with error: 0x%x\n", ERROR, GetLastError());
 	}
 

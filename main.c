@@ -1,92 +1,111 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define ERROR "[-]"
-#define SUCCES "[+]"
+#define SUCCESS "[+]"
 #define INFO "[>]"
 
 char* GetClipboard() {
-	UINT uFormat = CF_TEXT;
-	HANDLE hClipData = NULL;
-	char* cClipText = NULL;
-	char* cClipFormated = NULL;
+    UINT uFormat = CF_TEXT;
+    HANDLE hClipData = NULL;
+    char* cClipText = NULL;
+    char* cClipFormatted = NULL;
 
-	if (!OpenClipboard(NULL)) {
-		printf("%s OpenClipboard failed with error: 0x%x\n", ERROR, GetLastError());
-		return 1;
-	}
+    if (!OpenClipboard(NULL)) {
+        printf("%s OpenClipboard failed with error: 0x%x\n", ERROR, GetLastError());
+        return NULL;
+    }
 
-	printf("%s Waiting for clipboard data...\n", INFO);
-	hClipData = GetClipboardData(uFormat);
-	if (hClipData == NULL) {
-		printf("%s GetClipboardData failed with error: 0x%x\n", ERROR, GetLastError());
-		return 1;
-	}
-	printf("%s Successfully retrieved data from clipboard!\n", SUCCES);
+    printf("%s Waiting for clipboard data...\n", INFO);
+    hClipData = GetClipboardData(uFormat);
+    if (hClipData == NULL) {
+        printf("%s GetClipboardData failed with error: 0x%x\n", ERROR, GetLastError());
+        CloseClipboard();
+        return NULL;
+    }
+    printf("%s Successfully retrieved data from clipboard!\n", SUCCESS);
 
-	if (!CloseClipboard) {
-		printf("%s CloseClipboard failed with error: 0x%x\n", ERROR, GetLastError());
-		return 1;
-	}
+    cClipText = (char*)GlobalLock(hClipData);
+    if (cClipText == NULL) {
+        printf("%s GlobalLock failed with error: 0x%x\n", ERROR, GetLastError());
+        CloseClipboard();
+        return NULL;
+    }
 
-	cClipText = GlobalLock(hClipData);
-	if (cClipText == NULL) {
-		printf("%s GlobalLock failed with error: 0x%x\n", ERROR, GetLastError());
-	}
+    // Copy the clipboard text safely
+    cClipFormatted = (char*)malloc(strlen(cClipText) + 50);
+    if (cClipFormatted == NULL) {
+        printf("%s Memory allocation failed with error: 0x%x\n", ERROR, GetLastError());
+        GlobalUnlock(hClipData);
+        CloseClipboard();
+        return NULL;
+    }
 
-	if (!GlobalUnlock(hClipData)) {
-		printf("%s GlobalUnlock failed with error: 0x%x\n", ERROR, GetLastError());
-		return 1;
-	}
-	cClipFormated = (char*)malloc(strlen(cClipText) + 1);
-	if (cClipFormated == NULL) {
-		printf("%s Memory allocation failed with error: 0x%x", ERROR, GetLastError());
-		return 1;
-	}
+    sprintf(cClipFormatted, "====================\n%s\n====================", cClipText);
 
-	printf("%s Clipboard data:\n", SUCCES);
-	sprintf(cClipFormated, "====================\n%s\n====================", cClipText);
+    GlobalUnlock(hClipData);
+    CloseClipboard();
 
-	return cClipFormated;
+    return cClipFormatted; // Caller must free this!
 }
 
-int main(int argc, char *argv[]) {
-	/*
-	char* cOldClipText = NULL;
-	char* cCurrentClipText = NULL;
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        printf("Usage: %s <filename>\n", argv[0]);
+        return 1;
+    }
 
-	while (1) {
-		cCurrentClipText = GetClipboard();
-		if (cOldClipText == NULL || strcmp(cCurrentClipText, cOldClipText) != 0) {
-			puts("Clipboard text changed!");
-			cOldClipText = cCurrentClipText;
-			printf("%s\n", cCurrentClipText);
-		}
-		
-		Sleep(5000);
-	}
-	*/
-	char* cClipText = NULL;
-	cClipText = GetClipboard();
-	printf("%s\n", cClipText);
+    char* cOldClipText = NULL;
+    char* cClipText = NULL;
+    LPCSTR lpFileName = argv[1];
+    HANDLE hFile = NULL;
 
-	LPCSTR lpFileName = argv[1];
-	HANDLE hFile = NULL;
-	DWORD sClipTextSize = strlen(cClipText);
-	LPDWORD lpNumberOfBytesWritten;
+    while (1) {
+        hFile = NULL;
+        cClipText = GetClipboard();
+        if (!cClipText) {
+            printf("%s Failed to get clipboard data.\n", ERROR);
+            Sleep(5000);
+            continue;
+        }
 
-	printf("%s Writing to a file\n", INFO);
+        printf("cOldClipText: %s\n", cOldClipText ? cOldClipText : "(null)");
+        printf("cClipText: %s\n", cClipText);
 
-	hFile = CreateFileA(lpFileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == NULL) {
-		printf("%s CreateFile failed with error: 0x%x\n", ERROR, GetLastError());
-		return 1;
-	}
+        if (cOldClipText == NULL || strcmp(cClipText, cOldClipText) != 0) {
+            puts("Clipboard text changed!");
 
-	if (!WriteFile(hFile, cClipText, sClipTextSize, &lpNumberOfBytesWritten, NULL)) {
-		printf("%s WriteFile failed with error: 0x%x\n", ERROR, GetLastError());
-	}
+            // Free old clipboard text
+            if (cOldClipText) {
+                free(cOldClipText);
+            }
+            cOldClipText = _strdup(cClipText);
 
-	return 0;
+            // Write to file
+            DWORD sClipTextSize = strlen(cClipText);
+            DWORD dwBytesWritten;
+
+            printf("%s Writing to a file\n", INFO);
+            hFile = CreateFileA(lpFileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (hFile == INVALID_HANDLE_VALUE) {
+                printf("%s CreateFile failed with error: 0x%x\n", ERROR, GetLastError());
+                free(cClipText);
+                return 1;
+            }
+
+            if (!WriteFile(hFile, cClipText, sClipTextSize, &dwBytesWritten, NULL)) {
+                printf("%s WriteFile failed with error: 0x%x\n", ERROR, GetLastError());
+            }
+
+            CloseHandle(hFile);
+        }
+
+        free(cClipText);
+        Sleep(5000);
+    }
+
+    return 0;
 }

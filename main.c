@@ -35,7 +35,6 @@ char* GetClipboard() {
         return NULL;
     }
 
-    // Copy the clipboard text safely
     cClipFormatted = (char*)malloc(strlen(cClipText) + 50);
     if (cClipFormatted == NULL) {
         printf("%s Memory allocation failed with error: 0x%x\n", ERROR, GetLastError());
@@ -44,12 +43,16 @@ char* GetClipboard() {
         return NULL;
     }
 
-    sprintf(cClipFormatted, "====================\n%s\n====================", cClipText);
+    sprintf(cClipFormatted, 
+        "=====START=====\n"
+        "%s\n"
+        "======END======\n",
+        cClipText);
 
     GlobalUnlock(hClipData);
     CloseClipboard();
 
-    return cClipFormatted; // Caller must free this!
+    return cClipFormatted;
 }
 
 int main(int argc, char* argv[]) {
@@ -72,29 +75,26 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        printf("cOldClipText: %s\n", cOldClipText ? cOldClipText : "(null)");
-        printf("cClipText: %s\n", cClipText);
-
         if (cOldClipText == NULL || strcmp(cClipText, cOldClipText) != 0) {
-            puts("Clipboard text changed!");
+            printf("%s Clipboard text changed!\n", INFO);
 
-            // Free old clipboard text
             if (cOldClipText) {
                 free(cOldClipText);
             }
             cOldClipText = _strdup(cClipText);
 
-            // Write to file
             DWORD sClipTextSize = strlen(cClipText);
             DWORD dwBytesWritten;
 
             printf("%s Writing to a file\n", INFO);
-            hFile = CreateFileA(lpFileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            hFile = CreateFileA(lpFileName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
             if (hFile == INVALID_HANDLE_VALUE) {
                 printf("%s CreateFile failed with error: 0x%x\n", ERROR, GetLastError());
                 free(cClipText);
                 return 1;
             }
+
+            SetFilePointer(hFile, 0, NULL, FILE_END);
 
             if (!WriteFile(hFile, cClipText, sClipTextSize, &dwBytesWritten, NULL)) {
                 printf("%s WriteFile failed with error: 0x%x\n", ERROR, GetLastError());

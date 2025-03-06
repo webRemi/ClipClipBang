@@ -51,7 +51,7 @@ char* GetClipboard() {
 	return cClipFormated;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	/*
 	char* cOldClipText = NULL;
 	char* cCurrentClipText = NULL;
@@ -70,6 +70,24 @@ int main() {
 	char* cClipTextX = NULL;
 	cClipTextX = GetClipboard();
 	printf("%s\n", cClipTextX);
+
+	LPCSTR lpFileName = argv[1];
+	HANDLE hFile = NULL;
+	char* cBuffer = cClipTextX;
+	LPDWORD dwNumberofBytestoWrite = strlen(cClipTextX);
+	DWORD dwNumberOfbytesWritten;
+
+	printf("%s Writing to a file\n", INFO);
+
+	hFile = CreateFileA(lpFileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile == NULL) {
+		printf("%s CreateFile failed with error: 0x%x\n", ERROR, GetLastError());
+		return 1;
+	}
+
+	if (!WriteFile(hFile, cBuffer, dwNumberofBytestoWrite, &dwNumberOfbytesWritten, NULL)) {
+		printf("%s WriteFile failed with error: 0x%x\n", ERROR, GetLastError());
+	}
 
 	return 0;
 }
